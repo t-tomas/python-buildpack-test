@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# This script serves as the Pylibmc build step of the
+# [**Python Buildpack**](https://github.com/cloudfoundry/python-buildpack)
+# compiler.
+#
+# This script is invoked by [`bin/compile`](/).
+
+# The location of the pre-compiled libmemcached binary.
+VENDORED_MEMCACHED="https://lang-python.s3.amazonaws.com/$STACK/libraries/vendor/libmemcache.tar.gz"
+
+# Syntax sugar.
+source $BIN_DIR/utils
+
+
+bpwatch start pylibmc_install
+
+# If pylibmc exists within requirements, use vendored libmemcached.
+if (pip-grep -s requirements.txt pylibmc &> /dev/null) then
+
+  if [ ! -d ".heroku/vendor/lib/sasl2" ]; then
+    echo "-----> Noticed pylibmc. Bootstrapping libmemcached."
+    mkdir -p .heroku/vendor
+ 
+    # Download and extract libmemcached into target vendor directory.
+    exit_code=0
+    filtered_url=$($ROOT_DIR/compile-extensions/bin/download_dependency $VENDORED_MEMCACHED /tmp)
+    $ROOT_DIR/compile-extensions/bin/warn_if_newer_patch $VENDORED_MEMCACHED "$ROOT_DIR/manifest.yml"
+    echo "Downloaded [$filtered_url]"
+
+    downloaded_file=/tmp/libmemcache.tar.gz
+    tar zxvf $downloaded_file -C .heroku/vendor &> /dev/null
+    rm $downloaded_file
+  fi
+
+  export LIBMEMCACHED=$(pwd)/vendor
+fi
+
+bpwatch stop pylibmc_install
